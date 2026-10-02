@@ -3,6 +3,9 @@ import Parser from 'rss-parser';
 const KEYWORDS =[
     "верстк",
     "вёрстк",
+    "правки",
+    "разработка",
+    "доработка",
     "html",
     "css",
     "лендинг",
@@ -12,6 +15,7 @@ const KEYWORDS =[
     "javascript",
     "js",
     "сайт под ключ",
+    "сайт",
 ]
 
 const parser = new Parser();
@@ -39,9 +43,18 @@ export async function fetchOrders() {
 }
 
 export function filterOrders(orders) {
-    return orders.filter((order) => {
-        const textToSearch = `${order.title} ${order.description}`.toLowerCase();
+    const TWO_HOURS_MS = 5 * 60 * 60 * 1000;
+    const now = new Date();
 
+    return orders.filter((order) => {
+        const orderTime = new Date(order.pubDate).getTime();
+        const isFresh = (now - orderTime) < TWO_HOURS_MS;
+
+        if (!isFresh) {
+            return false;
+        }
+
+        const textToSearch = `${order.title} ${order.description}`.toLowerCase();
         return KEYWORDS.some((keyword) => textToSearch.includes(keyword.toLowerCase()))
     })
 }
