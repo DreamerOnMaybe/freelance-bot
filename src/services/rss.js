@@ -1,6 +1,9 @@
 import Parser from 'rss-parser';
 
-const KEYWORDS =[
+const parser = new Parser();
+const FEED_URL = "https://www.fl.ru/rss/all.xml";
+
+const KEYWORDS = [
     "верстк",
     "вёрстк",
     "правки",
@@ -18,9 +21,22 @@ const KEYWORDS =[
     "сайт",
 ]
 
-const parser = new Parser();
+const STOP_WORDS = [
+    "звонки",
+    "холодн",
+    "продаж",
+    "менеджер",
+    "копирайт",
+    "дизайн интерьер",
+];
 
-const FEED_URL = "https://www.fl.ru/rss/all.xml";
+function extractShortId(link = "") {
+    const match = link.match(/\/projects\/(\d+)\//)
+    if (match) {
+        return match[1]
+    }
+    return link.slice(-20).replace(/[^a-zA-Z0-9]/g, "")
+}
 
 export async function fetchOrders() {
     try {
@@ -28,7 +44,7 @@ export async function fetchOrders() {
 
         const orders = feed.items.map((item) => {
             return {
-                id: item.guid || item.link,
+                id: extractShortId(item.link) || String(Date.now()),
                 title: item.title,
                 link: item.link,
                 description: item.contentSnippet || item.content || "Без описания",
@@ -47,14 +63,19 @@ export function filterOrders(orders) {
     const now = new Date();
 
     return orders.filter((order) => {
-        const orderTime = new Date(order.pubDate).getTime();
-        const isFresh = (now - orderTime) < TWO_HOURS_MS;
 
-        if (!isFresh) {
+        const orderTime = new Date(order.pubDate).getTime();
+        if (now - orderTime > TWO_HOURS_MS) {
             return false;
         }
 
         const textToSearch = `${order.title} ${order.description}`.toLowerCase();
-        return KEYWORDS.some((keyword) => textToSearch.includes(keyword.toLowerCase()))
-    })
+
+        const hasStopWord = STOP_WORDS.some((word) => textToSearch.includes(word));
+        if (hasStopWord) {
+            return false;
+        }
+
+        return KEYWORDS.some((keyword) => textToSearch.includes(keyword.toLowerCase()));
+    });
 }

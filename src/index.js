@@ -3,6 +3,7 @@ import "dotenv/config";
 import cron from "node-cron";
 import { fetchOrders, filterOrders } from "./services/rss.js";
 import { getSeenIds, saveSeenIds } from "./services/storage.js";
+import { generateProposal } from "./services/ai.js";
 
 if (!process.env.BOT_TOKEN) {
   throw new Error("Критическая ошибка: BOT_TOKEN не задан в .env файле!");
@@ -10,6 +11,8 @@ if (!process.env.BOT_TOKEN) {
 
 const bot = new Bot(process.env.BOT_TOKEN);
 const CHAT_ID = process.env.CHAT_ID;
+
+const orderCache = new Map() 
 
 function escapeHtml(text = "") {
   return text
@@ -39,13 +42,15 @@ async function checkFreelance() {
     console.log(`Найдено новых заказов: ${newOrders.length}. Отправляю в Telegram...`);
 
     for (const order of newOrders) {
+      orderCache.set(order.id, order);
+
       const safeTitle = escapeHtml(order.title);
       const safeDescription = escapeHtml(order.description.slice(0, 300));
       const message = `🔥 <b>${safeTitle}</b>\n\n${safeDescription}...\n\n🔗 <a href="${order.link}">Посмотреть заказ</a>`;
 
       const keyboard = new InlineKeyboard().text(
         "✍️ Сгенерировать отклик",
-        "generate_response"
+        `gen_${order.id}`
       );
 
       await bot.api.sendMessage(CHAT_ID, message, {
@@ -71,13 +76,34 @@ bot.command("start", async (ctx) => {
   await ctx.reply("Привет! Твой ID сохранен. Скоро начнем мониторинг.");
 });
 
-bot.callbackQuery("generate_response", async (ctx) => {
-  await ctx.answerCallbackQuery();
+bot.callbackQuery(/^gen_(.+)$/, async (ctx) => {
+  await ctx.answerCallbackQuery({ text: "Генерирую отклик..." });
 
-  const originalPost = ctx.callbackQuery.message?.text;
+  const orderId = ctx.callbackQuery.data.replace("gen_", "")
+  const order = orderCache.get(orderId);
 
-  await ctx.reply("🤖 Получил задачу! Начинаю генерацию отклика через ИИ...");
-  console.log("Текст заказа для нейросети:\n", originalPost);
+  await ctx.replyWithChatAction("typing");
+
+  try {
+    let proposal = ""
+
+    if (order) {
+      proposal = await generateProposal(order.title, order.description);
+    } else {
+      const rawText = ctx.callbackQuery.message?.text
+      proposal = await generateProposal("Заказ", rawText)
+    }
+
+    const responseMessage = `💡 <b>Готовый отклик (нажми, чтобы скопировать):</b>\n\n<code>${escapeHtml(proposal)}</code>`;
+
+    await ctx.reply(responseMessage, {
+      parse_mode: "HTML",
+      reply_to_message_id: ctx.callbackQuery.message?.message_id,
+    })
+  } catch (error) {
+    console.error("Ошибка при генерации:", error.message)
+    await ctx.reply("⚠️ Не удалось сгенерировать отклик. Попробуй позже.");
+  }
 });
 
 bot.catch((err) => {
