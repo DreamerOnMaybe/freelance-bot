@@ -12,13 +12,14 @@ if (!process.env.BOT_TOKEN) {
 
 const bot = new Bot(process.env.BOT_TOKEN);
 const CHAT_ID = process.env.CHAT_ID;
+const orderCache = new Map();
 
 function setOrderCache(id, order) {
-  if (setOrderCache.size >= 200) {
-    const firstKey = setOrderCache.keys().next().value;
-    setOrderCache.delete(firstKey);
+  if (orderCache.size >= 200 && !orderCache.has(id)) {
+    const firstKey = orderCache.keys().next().value;
+    orderCache.delete(firstKey);
   }
-  setOrderCache.set(id, order);
+  orderCache.set(id, order);
 }
 
 function escapeHtml(text = "") {
@@ -70,20 +71,6 @@ async function checkFreelance() {
 
     for (const order of newOrders) {
       await sendOrderToChat(order);
-
-      const safeTitle = escapeHtml(order.title);
-      const safeDescription = escapeHtml(order.description.slice(0, 300));
-      const message = `🔥 <b>${safeTitle}</b>\n\n${safeDescription}...\n\n🔗 <a href="${order.link}">Посмотреть заказ</a>`;
-
-      const keyboard = new InlineKeyboard().text(
-        "✍️ Сгенерировать отклик",
-        `gen_${order.id}`
-      );
-
-      await bot.api.sendMessage(CHAT_ID, message, {
-        parse_mode: "HTML",
-        reply_markup: keyboard,
-      })
     }
 
     const updatedIds = [...seenIds, ...newOrders.map((o) => o.id)];
@@ -106,7 +93,7 @@ bot.command("start", async (ctx) => {
 bot.callbackQuery(/^gen_(.+)$/, async (ctx) => {
   await ctx.answerCallbackQuery({ text: "Генерирую отклик..." });
 
-  const orderId = ctx.callbackQuery.data.replace("gen_", "")
+  const orderId = ctx.callbackQuery.data.replace("gen_", "");
   const order = orderCache.get(orderId);
 
   await ctx.replyWithChatAction("typing");

@@ -120,7 +120,7 @@ export async function startTgListener(onNewOrderCallback) {
       };
 
       console.log(`[TG Listener] 🎯 Найден заказ в @${username}! Передаю в бота...`);
-      onNewOrderCallback(order);
+      await onNewOrderCallback(order);
     } catch (handlerErr) {
       console.error("[TG Listener] Ошибка обработки сообщения:", handlerErr.message);
     }
