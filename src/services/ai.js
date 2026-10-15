@@ -14,7 +14,8 @@ const MODEL_NAME = "qwen/qwen3.8-27b";
  */
 export async function generateProposal(taskTitle = "", taskDescription = "") {
   try {
-    const promptText = `Заказ:\nЗаголовок: ${taskTitle}\n\nОписание:\n${taskDescription}`;
+    const description = taskDescription?.trim() || "Описание не указано";
+    const promptText = `Заказ:\nЗаголовок: ${taskTitle}\n\nОписание:\n${description}`;
 
     const completion = await groq.chat.completions.create({
       model: MODEL_NAME,
@@ -22,21 +23,22 @@ export async function generateProposal(taskTitle = "", taskDescription = "") {
       messages: [
         {
           role: "system",
-          content: `Ты — опытный фронтенд-разработчик и специалист по верстке. 
+          content: `Ты — опытный фронтенд-разработчик и специалист по верстке.
 Твоя задача — написать короткий, живой и убедительный отклик на заказ с биржи.
 
 Правила:
 1. Без штампов вроде "Здравствуйте, ознакомился с ТЗ". Сразу к делу.
 2. Подчеркни понимание задачи и стек (чистый HTML5/CSS, Tailwind, JavaScript).
 3. Задай 1-2 экспертных вопроса по деталям (Figma, адаптивность, анимации, дедлайн).
-4. Объем: строго 3-5 предложений. Тон: вежливый, уверенный, партнерский.`,
+4. Объем: строго 3-5 предложений. Тон: вежливый, уверенный, партнерский.
+5. Описание может быть неполным — опирайся только на то что есть, не придумывай детали которых нет.`
         },
         {
           role: "user",
           content: promptText,
         },
       ],
-      temperature: 0.7,
+      temperature: 0.6,
     });
 
     const reply = completion.choices?.[0]?.message?.content;

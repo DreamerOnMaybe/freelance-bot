@@ -12,7 +12,7 @@ if (!process.env.BOT_TOKEN) {
 const bot = new Bot(process.env.BOT_TOKEN);
 const CHAT_ID = process.env.CHAT_ID;
 
-const orderCache = new Map() 
+const orderCache = new Map()
 
 function escapeHtml(text = "") {
   return text
@@ -94,8 +94,8 @@ bot.callbackQuery(/^gen_(.+)$/, async (ctx) => {
       proposal = await generateProposal("Заказ", rawText)
     }
 
-    const responseMessage = `💡 <b>Готовый отклик (нажми, чтобы скопировать):</b>\n\n<code>${escapeHtml(proposal)}</code>`;
-
+    const responseMessage = `🎯 <b>Готовый отклик</b> (нажми на блок для копирования):\n\n<pre>${escapeHtml(proposal)}</pre>`;
+    
     await ctx.reply(responseMessage, {
       parse_mode: "HTML",
       reply_to_message_id: ctx.callbackQuery.message?.message_id,
