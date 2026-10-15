@@ -14,7 +14,6 @@ const KEYWORDS = [
     "лендинг",
     "landing",
     "frontend",
-    "frontend",
     "javascript",
     "js",
     "сайт под ключ",
@@ -59,13 +58,13 @@ export async function fetchOrders() {
 }
 
 export function filterOrders(orders) {
-    const TWO_HOURS_MS = 5 * 60 * 60 * 1000;
-    const now = new Date();
+    const MAX_AGE_MS = 30 * 60 * 1000; 
+    const now = Date.now()
 
     return orders.filter((order) => {
 
         const orderTime = new Date(order.pubDate).getTime();
-        if (now - orderTime > TWO_HOURS_MS) {
+        if (now - orderTime > MAX_AGE_MS) {
             return false;
         }
 

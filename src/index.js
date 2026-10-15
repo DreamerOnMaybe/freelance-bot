@@ -4,6 +4,7 @@ import cron from "node-cron";
 import { fetchOrders, filterOrders } from "./services/rss.js";
 import { getSeenIds, saveSeenIds } from "./services/storage.js";
 import { generateProposal } from "./services/ai.js";
+import { startTgListener } from "./services/tgListener.js";
 
 if (!process.env.BOT_TOKEN) {
   throw new Error("Критическая ошибка: BOT_TOKEN не задан в .env файле!");
@@ -12,13 +13,39 @@ if (!process.env.BOT_TOKEN) {
 const bot = new Bot(process.env.BOT_TOKEN);
 const CHAT_ID = process.env.CHAT_ID;
 
-const orderCache = new Map()
+function setOrderCache(id, order) {
+  if (setOrderCache.size >= 200) {
+    const firstKey = setOrderCache.keys().next().value;
+    setOrderCache.delete(firstKey);
+  }
+  setOrderCache.set(id, order);
+}
 
 function escapeHtml(text = "") {
-  return text
+  return String(text ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+async function sendOrderToChat(order) {
+  setOrderCache.set(order.id, order);
+
+  const safeTitle = escapeHtml(order.title);
+  const safeDescription = escapeHtml(order.description.slice(0, 300));
+  const linkText = order.link ? `\n\n🔗 <a href="${order.link}">Открыть источник</a>` : "";
+
+  const message = `🔥 <b>${safeTitle}</b>\n\n${safeDescription}...${linkText}`;
+
+  const keyboard = new InlineKeyboard().text(
+    "✍️ Сгенерировать отклик",
+    `gen_${order.id}`
+  );
+
+  await bot.api.sendMessage(CHAT_ID, message, {
+    parse_mode: "HTML",
+    reply_markup: keyboard,
+  });
 }
 
 async function checkFreelance() {
@@ -42,7 +69,7 @@ async function checkFreelance() {
     console.log(`Найдено новых заказов: ${newOrders.length}. Отправляю в Telegram...`);
 
     for (const order of newOrders) {
-      orderCache.set(order.id, order);
+      await sendOrderToChat(order);
 
       const safeTitle = escapeHtml(order.title);
       const safeDescription = escapeHtml(order.description.slice(0, 300));
@@ -95,7 +122,7 @@ bot.callbackQuery(/^gen_(.+)$/, async (ctx) => {
     }
 
     const responseMessage = `🎯 <b>Готовый отклик</b> (нажми на блок для копирования):\n\n<pre>${escapeHtml(proposal)}</pre>`;
-    
+
     await ctx.reply(responseMessage, {
       parse_mode: "HTML",
       reply_to_message_id: ctx.callbackQuery.message?.message_id,
@@ -111,8 +138,9 @@ bot.catch((err) => {
 });
 
 bot.start({
-  onStart: (botInfo) => {
+  onStart: async (botInfo) => {
     console.log(`Бот @${botInfo.username} успешно запущен!`);
     checkFreelance();
+    await startTgListener(sendOrderToChat);
   },
 });
