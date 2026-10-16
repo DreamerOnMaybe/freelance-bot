@@ -1,12 +1,10 @@
 import OpenAI from "openai";
 
-// Модель можно менять через .env без правки кода. Список доступных: GET https://api.groq.com/openai/v1/models
-const MODEL_NAME = process.env.GROQ_MODEL || "qwen/qwen3-32b";
+const MODEL_NAME = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
 const MAX_DESCRIPTION_CHARS = 3000;
 
 let client = null;
 
-// Ленивая инициализация: не зависит от порядка импортов и dotenv
 function getClient() {
   if (!client) {
     if (!process.env.GROQ_API_KEY) {
@@ -54,7 +52,6 @@ export async function generateProposal(taskTitle = "", taskDescription = "") {
       ],
     };
 
-    // Qwen3 — reasoning-модель: отключаем «размышления», иначе они съедают токены
     if (/qwen3/i.test(MODEL_NAME)) {
       params.reasoning_effort = "none";
     }
@@ -62,7 +59,6 @@ export async function generateProposal(taskTitle = "", taskDescription = "") {
     const completion = await getClient().chat.completions.create(params);
 
     const raw = completion.choices?.[0]?.message?.content ?? "";
-    // Страховка: вырезаем <think>…</think>, если модель всё же их вернула
     const reply = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 
     if (!reply) {
